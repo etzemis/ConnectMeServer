@@ -6,6 +6,7 @@
     "express": "3.3.4",
     "mongodb": "*",
     "mongoose": "*", 
-    "mongoose-double": "*"
+    "mongoose-double": "*",
+    "password-hash": "*"
   }
 }

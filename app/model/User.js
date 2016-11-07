@@ -9,7 +9,8 @@ var userSchema = new Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   image_url: {type: String},
-  address: {type: String}
+  address: {type: String},
+  secret_token: {type: String}
 });
 
 // the schema is useless so far

@@ -4,6 +4,7 @@ var http = require('http');
 	express = require('express')
 	path = require('path')
 	mongoose = require('mongoose')
+	passwordHash = require('password-hash');
 
 // var options = {
 //   key: fs.readFileSync('key.pem'),
@@ -19,7 +20,7 @@ app.set('port', process.env.PORT || 3000);
 
 // Connection URL. This is where your mongodb server is running.
 var url = "mongodb://localhost:27017/ConnectMeDB"
-
+//var url = "mongodb://etzemis:Qwerty15@waffle.modulusmongo.net:27017/e4Buwaxa"
 // Connect to the db
 mongoose.connect(url);
 
@@ -39,12 +40,16 @@ app.use(express.bodyParser());
 app.post('/register', function (req, res) {
 	console.log(req.body);      // your JSON
 
+	var hashed_string= passwordHash.generate(req.body.email+req.body.password);
+	console.log(hashed_string);
+	console.log(passwordHash.verify(req.body.email+req.body.password, hashed_string));
 
 	var chris = new User({
   		username: req.body.username,
   		email: req.body.email,
   		password: req.body.password,
-  		address: req.body.address 
+  		address: req.body.address, 
+  		secret_token: hashed_string
 	});
 	chris.save(function(err) {
   	if (err) throw err;
@@ -55,8 +60,28 @@ app.post('/register', function (req, res) {
 });
  
 // Login User
-app.post('/log-in', function (req, res) {
-  	res.send('<html><body><h1>User Log In</h1></body></html>');
+app.post('/login', function (req, res) {
+	console.log(req.body);      // your JSON
+
+	User.findOne({ 'email': req.body.email }, 'password secret_token', function (err, user) {
+  		if (err) {
+  			console.log(err)
+  		}
+  		console.log('found.user')
+  		if (req.body.password == user.password) {
+			res.setHeader('Content-Type', 'application/json');
+  			res.json({"token": user.secret_token});
+  			console.log("Valid user")
+		}
+		else{
+			res.status(500).send('Invalid Username or Password')
+		}
+	})
+
+	
+
+
+	
 });
 
 // Update the location of a specific user
