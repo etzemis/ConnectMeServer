@@ -5,6 +5,7 @@ var http = require('http');
 	path = require('path')
 	mongoose = require('mongoose')
 	passwordHash = require('password-hash');
+	basicAuth = require('basic-auth')
 
 // var options = {
 //   key: fs.readFileSync('key.pem'),
@@ -30,6 +31,42 @@ app.use(express.static(path.join(__dirname, 'public')));
 //then you can use the bodyParser to parse place the result in request body of your router.
 app.use(express.bodyParser());
 
+//Authorize User with Basic Auth
+var auth = function (req, res, next) {
+  	var user = basicAuth(req);
+  	if (!user || !user.name || !user.pass) {
+    	res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+    	res.send(401).send('No authorization provided');
+    	return;
+  	}
+  	console.log(user.name)
+  	User.findOne({ 'email': user.name }, 'password', function (err, userLocal) {
+  		if (err) {
+  			console.log('BASIC AUTH: Error in querying');
+  			res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+    		res.status(401).send('Error in querying database');
+    		return next(err);
+  		}
+  		if (userLocal){
+	  		console.log('Basic Auth:  Found.user')
+	  		if (passwordHash.verify(user.name+userLocal.password, user.pass)) {   // pass is the hashed string
+	    		next();
+	  		} else {
+	  			console.log('BASIC AUTH: Passwords do not match')
+	    		res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+	    		res.status(500).send('passwords do not match');
+	    		return;
+	  		}
+  		}
+  		else{
+  			console.log('BASIC AUTH: Could not find user')
+	    	res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+	    	res.status(500).send('Could not find user');
+	    	return;
+  		}
+  	})
+}
+
 
 
 //*************
@@ -52,12 +89,15 @@ app.post('/register', function (req, res) {
   		secret_token: hashed_string
 	});
 	chris.save(function(err) {
-  	if (err) throw err;
+  		if (err){
+  			console.log(err)
+  		}
 		console.log('User saved successfully!');
 	});
 
-  res.send('<html><body><h1>User Registration</h1></body></html>');
+  	res.send('<html><body><h1>User Registration</h1></body></html>');
 });
+
  
 // Login User
 app.post('/login', function (req, res) {
@@ -67,25 +107,22 @@ app.post('/login', function (req, res) {
   		if (err) {
   			console.log(err)
   		}
-  		console.log('found.user')
+  		console.log('LOGIN: found.user')
   		if (req.body.password == user.password) {
 			res.setHeader('Content-Type', 'application/json');
   			res.json({"token": user.secret_token});
-  			console.log("Valid user")
+  			console.log("LOGIN: Valid User")
 		}
 		else{
 			res.status(500).send('Invalid Username or Password')
 		}
 	})
-
-	
-
-
-	
 });
 
+
 // Update the location of a specific user
-app.post('/location', function (req, res) {
+app.post('/location', auth, function (req, res) {
+	console.log(req.body); 
   	res.send('<html><body><h1> Post Location</h1></body></html>');
 });
 
