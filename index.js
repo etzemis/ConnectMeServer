@@ -20,10 +20,10 @@ var app = express();
 app.set('port', process.env.PORT || 3000);
 
 // Connection URL. This is where your mongodb server is running.
-var url = "mongodb://localhost:27017/ConnectMeDB"
+var dbUrl = "mongodb://localhost:27017/ConnectMeDB"
 //var url = "mongodb://etzemis:Qwerty15@waffle.modulusmongo.net:27017/e4Buwaxa"
 // Connect to the db
-mongoose.connect(url);
+mongoose.connect(dbUrl);
 
 // Folder to store the image urls
 app.use(express.static(path.join(__dirname, 'public')));
@@ -31,7 +31,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 //then you can use the bodyParser to parse place the result in request body of your router.
 app.use(express.bodyParser());
 
-//Authorize User with Basic Auth
+
+
+
+
+//*************
+//*** Basic authorization
+//*************
 var auth = function (req, res, next) {
   	var user = basicAuth(req);
   	if (!user || !user.name || !user.pass) {
@@ -39,7 +45,7 @@ var auth = function (req, res, next) {
     	res.send(401).send('No authorization provided');
     	return;
   	}
-  	console.log(user.name)
+  	// console.log(user.name)
   	User.findOne({ 'email': user.name }, 'password', function (err, userLocal) {
   		if (err) {
   			console.log('BASIC AUTH: Error in querying');
@@ -48,7 +54,7 @@ var auth = function (req, res, next) {
     		return next(err);
   		}
   		if (userLocal){
-	  		console.log('Basic Auth:  Found.user')
+	  		console.log('Basic Auth: Authorized')
 	  		if (passwordHash.verify(user.name+userLocal.password, user.pass)) {   // pass is the hashed string
 	    		next();
 	  		} else {
@@ -72,6 +78,8 @@ var auth = function (req, res, next) {
 //*************
 //*** SERVER API
 //*************
+
+
 
 // Register a user
 app.post('/register', function (req, res) {
@@ -98,7 +106,10 @@ app.post('/register', function (req, res) {
   	res.send('<html><body><h1>User Registration</h1></body></html>');
 });
 
- 
+
+
+
+
 // Login User
 app.post('/login', function (req, res) {
 	console.log(req.body);      // your JSON
@@ -120,16 +131,47 @@ app.post('/login', function (req, res) {
 });
 
 
+
+
+
 // Update the location of a specific user
 app.post('/location', auth, function (req, res) {
-	console.log(req.body); 
-  	res.send('<html><body><h1> Post Location</h1></body></html>');
+	console.log(req.body);
+    res.send("<html><body><h1>Post Location</h1></body></html>");
+
 });
 
+
+
+
 // Returns the travellers that are around the user
-app.get('/travellers', function (req, res) {
-  	res.send('<html><body><h1>Get Travellers</h1></body></html>');
+app.get('/travellers', auth, function (req, res) {
+    console.log(req.body)
+    var jsonToReturn = [{
+        username: "Thanasis",
+        address: "Ikoniou 4",
+        region: "Nikaia",
+        currentLatitude: 37.983709,
+        currentLongitude: 23.680877,
+        destinationLatitude: 37.997272,
+        destinationLongitude:23.686664,
+        extraPersons: 2
+    },
+    {
+        username: "Alexis",
+        address: "Argirokastrou",
+        region: "Aigaleo",
+        currentLatitude: 37.984470,
+        currentLongitude: 23.680367,
+        destinationLatitude: 37.997272,
+        destinationLongitude:23.686664,
+        extraPersons: 2
+    }];
+    res.json(jsonToReturn)
+
 });
+
+
 
 
 
