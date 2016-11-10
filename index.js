@@ -50,7 +50,7 @@ var auth = function (req, res, next) {
   		if (err) {
   			console.log('BASIC AUTH: Error in querying');
   			res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-    		res.status(401).send('Error in querying database');
+    		res.status(500).send('Error in querying database');
     		return next(err);
   		}
   		if (userLocal){
@@ -60,14 +60,14 @@ var auth = function (req, res, next) {
 	  		} else {
 	  			console.log('BASIC AUTH: Passwords do not match')
 	    		res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-	    		res.status(500).send('passwords do not match');
+	    		res.status(401).send('passwords do not match');
 	    		return;
 	  		}
   		}
   		else{
   			console.log('BASIC AUTH: Could not find user')
 	    	res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-	    	res.status(500).send('Could not find user');
+	    	res.status(401).send('Could not find user');
 	    	return;
   		}
   	})
@@ -102,12 +102,14 @@ app.post('/register', function (req, res) {
   		}
 		console.log('User saved successfully!');
 	});
-
-  	res.send('<html><body><h1>User Registration</h1></body></html>');
+	// If username exists then return that
+			// res.json({message: "Username already Exists"});
+	// If internal error in Saving or whatever
+			// res.status(500).send('Server Internal Error')
+	// If everything is successful
+    res.json({success: "User Registration Successful"});
+  	// res.send('<html><body><h1>User Registration</h1></body></html>');
 });
-
-
-
 
 
 // Login User
@@ -117,31 +119,32 @@ app.post('/login', function (req, res) {
 	User.findOne({ 'email': req.body.email }, 'password secret_token', function (err, user) {
   		if (err) {
   			console.log(err)
+			res.status(500).send('Server Internal Error')
   		}
   		console.log('LOGIN: found.user')
-  		if (req.body.password == user.password) {
-			res.setHeader('Content-Type', 'application/json');
-  			res.json({"token": user.secret_token});
-  			console.log("LOGIN: Valid User")
-		}
-		else{
-			res.status(500).send('Invalid Username or Password')
-		}
+
+		res.setHeader('Content-Type', 'application/json');
+
+        if (req.body.password != user.password) {
+            res.json({message: "Invalid Username or Password"})
+        } else {
+            res.json({token: user.secret_token});
+            console.log("LOGIN: Valid User")
+        }
 	})
 });
 
 
-
-
-
 // Update the location of a specific user
 app.post('/location', auth, function (req, res) {
+    // If internal error in Saving or whatever
+    // res.status(500).send('Server Internal Error')
+    // If everything is successful
+    // res.send("<html><body><h1>Post Location was Successful</h1></body></html>");
 	console.log(req.body);
-    res.send("<html><body><h1>Post Location</h1></body></html>");
+    res.send("<html><body><h1>Post Location was Successful</h1></body></html>");
 
 });
-
-
 
 
 // Returns the travellers that are around the user
@@ -155,7 +158,8 @@ app.get('/travellers', auth, function (req, res) {
         currentLongitude: 23.680877,
         destinationLatitude: 37.997272,
         destinationLongitude:23.686664,
-        extraPersons: 2
+        extraPersons: 2,
+		imageUrl: "http://192.168.1.91:3000/photo1.jpg"
     },
     {
         username: "Alexis",
@@ -165,10 +169,29 @@ app.get('/travellers', auth, function (req, res) {
         currentLongitude: 23.680367,
         destinationLatitude: 37.997272,
         destinationLongitude:23.686664,
-        extraPersons: 2
+        extraPersons: 2,
+		imageUrl: "http://192.168.1.91:3000/photo2.jpg"
     }];
     res.json(jsonToReturn)
 
+    // If username exists then return that
+    // res.json({message: "Username already Exists"});
+    // If internal error in Saving or whatever
+    // res.status(500).send('Server Internal Error')
+});
+
+
+
+// Update the location of a specific user
+app.post('/destination', auth, function (req, res) {
+	console.log(req.body);
+	// res.send("<html><body><h1>Post Destination</h1></body></html>");
+	res.json({"OK": "Insert of Destination was successful"});
+
+    // If username exists then return that
+    // res.json({message: "Username already Exists"});
+    // If internal error in Saving or whatever
+    //res.status(401).send('Server Internal Error')
 });
 
 
