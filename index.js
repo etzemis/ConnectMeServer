@@ -121,15 +121,22 @@ app.post('/login', function (req, res) {
   			console.log(err)
 			res.status(500).send('Server Internal Error')
   		}
-  		console.log('LOGIN: found.user')
+  		else {
+            if (!user){
+                res.json({message: "Invalid Username or Password"})
+            }
+            else {
+                console.log('LOGIN: found.user')
 
-		res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Content-Type', 'application/json');
 
-        if (req.body.password != user.password) {
-            res.json({message: "Invalid Username or Password"})
-        } else {
-            res.json({token: user.secret_token});
-            console.log("LOGIN: Valid User")
+                if (req.body.password != user.password) {
+                    res.json({message: "Invalid Username or Password"})
+                } else {
+                    res.json({token: user.secret_token});
+                    console.log("LOGIN: Valid User")
+                }
+            }
         }
 	})
 });
