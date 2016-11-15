@@ -1,4 +1,6 @@
-//1
+//**************************************
+// Include Necessary Files
+//**************************************
 var http = require('http');
 	fs = require('fs')
 	express = require('express')
@@ -7,116 +9,175 @@ var http = require('http');
 	passwordHash = require('password-hash');
 	basicAuth = require('basic-auth')
 
-// var options = {
-//   key: fs.readFileSync('key.pem'),
-//   cert: fs.readFileSync('cert.pem')
-// };
 
+//**************************************
+// Load the Models
+//**************************************
 
-// Load the model
 var User = require('./app/model/User');
+
+//**************************************
+// Init Express and Set the port to 3000
+//**************************************
 
 var app = express();
 app.set('port', process.env.PORT || 3000);
 
-// Connection URL. This is where your mongodb server is running.
+//**************************************
+// Connect To Mongo Database
+//**************************************
+
 var dbUrl = "mongodb://localhost:27017/ConnectMeDB"
-//var url = "mongodb://etzemis:Qwerty15@waffle.modulusmongo.net:27017/e4Buwaxa"
-// Connect to the db
+	// var url = "mongodb://etzemis:Qwerty15@waffle.modulusmongo.net:27017/e4Buwaxa"
 mongoose.connect(dbUrl);
 
-// Folder to store the image urls
+
+//**************************************
+// Create Public folder for String User Images. Setup JSON Parsing
+//**************************************
+
 app.use(express.static(path.join(__dirname, 'public')));
-//f you are using valid JSON and are POSTing it with Content-Type: application/json, 
+//f you are using valid JSON and are Posting it with Content-Type: application/json,
 //then you can use the bodyParser to parse place the result in request body of your router.
 app.use(express.bodyParser());
 
 
 
+//**************************************
+// Basic Authorization
+//**************************************
+
+var auth = function (req, res, next)
+{
+	var user = basicAuth(req);
+	if (!user || !user.name || !user.pass)
+	{
+		res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+		res.send(401).send('No authorization provided');
+		return;
+	}
+
+	User.findOne({'email': user.name}, 'password', function (err, userLocal)
+	{
+		if (err)
+		{
+			console.log('BASIC AUTH: Error in querying');
+			res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+			res.status(500).send('Error in querying database');
+			return next(err);
+		}
+		if (userLocal)
+		{
+			console.log('Basic Auth: Authorized');
+			if (passwordHash.verify(user.name + userLocal.password, user.pass))
+			{   // pass is the hashed string
+				next();
+			}
+			else
+			{
+				console.log('BASIC AUTH: Passwords do not match');
+				res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+				res.status(401).send('passwords do not match');
+				return;
+			}
+		}
+		else
+		{
+			console.log('BASIC AUTH: Could not find user');
+			res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+			res.status(401).send('Could not find user');
+			return;
+		}
+	});
+};
 
 
-//*************
-//*** Basic authorization
-//*************
-var auth = function (req, res, next) {
-  	var user = basicAuth(req);
-  	if (!user || !user.name || !user.pass) {
-    	res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-    	res.send(401).send('No authorization provided');
-    	return;
-  	}
-  	// console.log(user.name)
-  	User.findOne({ 'email': user.name }, 'password', function (err, userLocal) {
-  		if (err) {
-  			console.log('BASIC AUTH: Error in querying');
-  			res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-    		res.status(500).send('Error in querying database');
-    		return next(err);
-  		}
-  		if (userLocal){
-	  		console.log('Basic Auth: Authorized')
-	  		if (passwordHash.verify(user.name+userLocal.password, user.pass)) {   // pass is the hashed string
-	    		next();
-	  		} else {
-	  			console.log('BASIC AUTH: Passwords do not match')
-	    		res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-	    		res.status(401).send('passwords do not match');
-	    		return;
-	  		}
-  		}
-  		else{
-  			console.log('BASIC AUTH: Could not find user')
-	    	res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-	    	res.status(401).send('Could not find user');
-	    	return;
-  		}
-  	})
-}
+//**************************************
+// SERVER API
+//**************************************
 
 
 
-//*************
-//*** SERVER API
-//*************
 
+//**************************************
+// Registration
+//**************************************
 
-
-// Register a user
 app.post('/register', function (req, res) {
-	console.log(req.body);      // your JSON
 
+	// Generated Hashed String
 	var hashed_string= passwordHash.generate(req.body.email+req.body.password);
-	console.log(hashed_string);
-	console.log(passwordHash.verify(req.body.email+req.body.password, hashed_string));
 
-	var chris = new User({
-  		username: req.body.username,
-  		email: req.body.email,
-  		password: req.body.password,
-  		address: req.body.address, 
-  		secret_token: hashed_string
+	// If Photo exists, Parse ti and Save it. Otherwise save "Default"
+    var photoName = "default"
+    if (req.body.profilePhoto !== "default")
+    {
+        // Parse and save the Profile Image
+        photoName = req.body.email.substring(0, req.body.email.indexOf('.'));
+        photoName += ".png"
+        require("fs").writeFile("./public/" + photoName, req.body.profilePhoto, 'base64', function (err) {
+			if (err)
+			{
+				console.log(err);
+				res.status(500).send('Server Internal Error')
+			}
+        });
+    }
+
+    //Check Email Availability
+
+	User.findOne({'email': req.body.email}, 'password secretToken', function (err, user)
+	{
+		if (err)
+		{
+			console.log(err)
+			res.status(500).send('Server Internal Error');
+		} else
+		{
+			if (user)
+			{	// If already exists
+				res.json({message: "User Already Exists"});
+			}
+			else
+			{
+				//Create User
+				var newUser = new User({
+					username: req.body.username,
+					email: req.body.email,
+					password: req.body.password,
+					address: req.body.address,
+					secretToken: hashed_string,
+					imageUrl: photoName
+				});
+
+				//Save User to DB
+				newUser.save(function(err)
+				{
+					if (err)
+					{
+						console.log(err)
+						res.status(500).send('Server Internal Error');
+					}
+					else
+					{
+						res.json({success: "User Registration Successful"});
+					}
+				});
+			}
+		}
 	});
-	chris.save(function(err) {
-  		if (err){
-  			console.log(err)
-  		}
-		console.log('User saved successfully!');
-	});
-	// If username exists then return that
-			// res.json({message: "Username already Exists"});
-	// If internal error in Saving or whatever
-			// res.status(500).send('Server Internal Error')
-	// If everything is successful
-    res.json({success: "User Registration Successful"});
-  	// res.send('<html><body><h1>User Registration</h1></body></html>');
 });
 
 
+
+//**************************************
+//
+//**************************************
 // Login User
 app.post('/login', function (req, res) {
 	console.log(req.body);      // your JSON
 
-	User.findOne({ 'email': req.body.email }, 'password secret_token', function (err, user) {
+	User.findOne({ 'email': req.body.email }, 'username imageUrl password secretToken', function (err, user) {
   		if (err) {
   			console.log(err)
 			res.status(500).send('Server Internal Error')
@@ -133,7 +194,12 @@ app.post('/login', function (req, res) {
                 if (req.body.password != user.password) {
                     res.json({message: "Invalid Username or Password"})
                 } else {
-                    res.json({token: user.secret_token});
+                    var jsonToReturn = {token: user.secretToken,
+                        username: user.username,
+                        imageUrl: user.imageUrl};
+                    console.log(jsonToReturn)
+                    res.json(jsonToReturn);
+
                     console.log("LOGIN: Valid User")
                 }
             }
@@ -142,6 +208,9 @@ app.post('/login', function (req, res) {
 });
 
 
+//**************************************
+//
+//**************************************
 // Update the location of a specific user
 app.post('/location', auth, function (req, res) {
     // If internal error in Saving or whatever
@@ -166,7 +235,7 @@ app.get('/travellers', auth, function (req, res) {
         destinationLatitude: 37.997272,
         destinationLongitude:23.686664,
         extraPersons: 2,
-		imageUrl: "http://192.168.1.91:3000/photo1.jpg"
+		imageUrl: "photo1.jpg"
     },
     {
         username: "Alexis",
@@ -177,7 +246,7 @@ app.get('/travellers', auth, function (req, res) {
         destinationLatitude: 37.997272,
         destinationLongitude:23.686664,
         extraPersons: 2,
-		imageUrl: "http://192.168.1.91:3000/photo2.jpg"
+		imageUrl: "photo2.jpg"
     }];
     res.json(jsonToReturn)
 
