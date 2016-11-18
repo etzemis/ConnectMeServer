@@ -15,7 +15,7 @@ var http = require('http');
 //**************************************
 
 var User = require('./app/model/User');
-
+var TripRequest = require('./app/model/TripRequest')
 //**************************************
 // Init Express and Set the port to 3000
 //**************************************
@@ -311,8 +311,10 @@ app.post('/location', auth, function (req, res)
 // Returns the travellers that are around the user
 app.get('/travellers', auth, function (req, res)
 {
-	console.log("\nFetch Travellers\n")
+
 	var connectedUser = basicAuth(req);
+	console.log("\nFetch Travellers: "+connectedUser.name+"\n")
+
 	User.findOne({'email': connectedUser.name}, 'location', function (err, user)
 	{
 		if (err)
@@ -368,21 +370,39 @@ app.post('/destination', auth, function (req, res)
 		if (recordsUpdated)
 		{
 			console.log('User location updated successfully!');
-			User.findOne({'email': user.name}, function (err, user)
-			{
-				console.log(user);
-			});
-			res.send("<html><body><h1>Post destination was successful</h1></body></html>");
+			res.send("");
 		}
 		else
 		{
 			console.log('User not found !');
+			res.status(401).send('Can not find user');
 		}
-		res.send("<html><body><h1>Post destination was unuccessful :( </h1></body></html>");
-		res.json({"OK": "Insert of Destination was successful"});
-
 	});
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//**************************************
+// TRIP Request
+//**************************************
+
+
+
+
 
 
 
@@ -393,7 +413,7 @@ app.post('/destination', auth, function (req, res)
 // Returns the travellers that are around the user
 app.get('/trip/travellers', auth, function (req, res)
 {
-	console.log("\nFetch Travellers\n")
+	console.log("\nTrip Request Fetch Travellers\n")
 	var connectedUser = basicAuth(req);
 	User.findOne({'email': connectedUser.name}, 'destination', function (err, user)
 	{
@@ -418,20 +438,21 @@ app.get('/trip/travellers', auth, function (req, res)
 
 
 
+
 			// find a location
-			User.find({'destination.coordinates': {$nearSphere: [user.destination.coordinates[0], user.destination.coordinates[1]], $maxDistance: highProximityDistance}, 'email': {$ne: connectedUser.name} }, "username email location destination imageUrl").limit(limit).sort().exec(function(err, highProxDestinations)
+			User.find({'destination.coordinates': {$nearSphere: [user.destination.coordinates[0], user.destination.coordinates[1]], $maxDistance: highProximityDistance}, 'email': {$ne: connectedUser.name}, 'statusMode': {$eq: 2}}, "username email location destination imageUrl").limit(limit).sort().exec(function(err, highProxDestinations)
 			{
 				if (err)
 				{
 					res.status(500).send('Server Internal Error');
 				}
-				User.find({'destination.coordinates': {$nearSphere: [user.destination.coordinates[0], user.destination.coordinates[1]], $minDistance: highProximityDistance, $maxDistance: mediumProximityDistance}, 'email': {$ne: connectedUser.name} }, "username email location destination imageUrl").limit(limit).sort().exec(function(err, medProxDestinations)
+				User.find({'destination.coordinates': {$nearSphere: [user.destination.coordinates[0], user.destination.coordinates[1]], $minDistance: highProximityDistance, $maxDistance: mediumProximityDistance}, 'email': {$ne: connectedUser.name}, 'statusMode': {$eq: 2} }, "username email location destination imageUrl").limit(limit).sort().exec(function(err, medProxDestinations)
 				{
 					if (err)
 					{
 						res.status(500).send('Server Internal Error');
 					}
-					User.find({'destination.coordinates': {$nearSphere: [user.destination.coordinates[0], user.destination.coordinates[1]], $minDistance: mediumProximityDistance, $maxDistance: lowProximityDistance}, 'email': {$ne: connectedUser.name} }, "username email location destination imageUrl").limit(limit).sort().exec(function(err, lowProxDestinations)
+					User.find({'destination.coordinates': {$nearSphere: [user.destination.coordinates[0], user.destination.coordinates[1]], $minDistance: mediumProximityDistance, $maxDistance: lowProximityDistance}, 'email': {$ne: connectedUser.name}, 'statusMode': {$eq: 2}}, "username email location destination imageUrl").limit(limit).sort().exec(function(err, lowProxDestinations)
 					{
 						if (err)
 						{
@@ -454,6 +475,336 @@ app.get('/trip/travellers', auth, function (req, res)
 	});
 });
 
+
+//**************************************
+// Create Trip Request
+//**************************************
+
+app.post('/tripRequest/create', auth, function (req, res)
+{
+
+	var user = basicAuth(req);
+	TripRequest.find({$or:[{'from': user.name}, {'to': user.name}]}, 'From', function (err, inTripRequest)
+	{
+		console.log("In Trip Request"+inTripRequest);
+		if (err)
+		{
+			console.log(err);
+			res.status(500).send('Server Internal Error');
+		}
+		else
+		{
+			var travellers = req.body.travellers;
+			var numOfTravellers = travellers.length;
+			if (!inTripRequest.length)
+			{
+				var coTravellers = [];
+				for (let i = 0; i < numOfTravellers; i++)
+				{
+
+					TripRequest.find({$or: [{'From': travellers[i]}, {'To': travellers[i]}]}, 'From', function (err, invitedInTripRequest)
+					{
+						// Maybe we need to check that User is in mode 2. Handle the case that he user has exited
+						if (err)
+						{
+							res.status(500).send('Server Internal Error');
+						}
+						else
+						{
+							if (!invitedInTripRequest.length)
+							{
+								var newTripRequest = new TripRequest({
+									from: user.name,
+									to: travellers[i],
+									statusMode: 0
+								});
+								newTripRequest.save(function (err)
+								{
+									if (err)
+									{
+										res.status(500).send('Server Internal Error');
+									}
+
+
+									coTravellers.push(travellers[i]);
+									if ( i === numOfTravellers-1)
+									{
+										//Update the State of The Creator to 3:
+										User.update({'email': user.name}, {$set: {'statusMode': 3}}, function (err, recordsUpdated)
+										{
+                                            if (err)
+                                            {
+                                                console.log(err);
+                                                res.status(500).send('Server Internal Error');
+                                            }
+                                            if (recordsUpdated)
+                                            {
+                                                res.json({"success": coTravellers});
+                                            }
+                                            else
+                                            {
+                                                res.status(500).send('Server Internal Error');
+                                            }
+										});
+
+
+
+									}
+								});
+							}
+							else
+							{
+								console.log('TripRequest was insuccessful!');
+							}
+						}
+					});
+				}
+			}
+			else
+			{
+				res.json({message: "You are already in a trip request!"});
+			}
+		}
+	});
+});
+
+
+//**************************************
+// Refresh Invitations
+//**************************************
+
+app.get('/tripRequest/refresh/invitations', auth, function (req, res)
+{
+
+	var user = basicAuth(req);
+	TripRequest.find({'to': user.name}, 'from', function (err, creatorOfTripRequest)
+	{
+		if (err)
+		{
+			console.log(err);
+			res.status(500).send('Server Internal Error');
+		}
+		else
+		{
+            if (creatorOfTripRequest.length)
+			{
+                // Check if the request is not already rejected
+				TripRequest.find({'from': creatorOfTripRequest[0].from, 'statusMode': {$ne: 2}},  'to', function (err, invitedInTripRequest)
+				{
+					if (err)
+					{
+						res.status(500).send('Server Internal Error');
+					}
+					else
+					{
+						if(invitedInTripRequest.length) {
+                            console.log(invitedInTripRequest.length);
+							var coTravellers = [creatorOfTripRequest[0].from];
+
+							for (var i = 0; i < invitedInTripRequest.length; i++)
+							{
+								if (invitedInTripRequest[i].to!== user.name)
+								{
+									coTravellers.push(invitedInTripRequest[i].to);
+								}
+							}
+							console.log(coTravellers)
+
+							User.find({'email': {$in: coTravellers}}, function (err, usersInTrip) {
+								if (err) {
+									res.status(500).send('Server Internal Error');
+								}
+								else {
+									if (usersInTrip.length !== 0) {
+										//update my mode put in Trip
+										res.json(usersInTrip);
+									}
+								}
+							});
+						}
+						else
+						{
+							res.json({message: "The trip was cancelled!"});
+						}
+					}
+				});
+			}
+			else
+			{
+				console.log("No Invitations Yet")
+				res.json({message: "No invitations yet!"});
+			}
+		}
+	});
+});
+
+
+//**************************************
+// Refresh Status
+//**************************************
+
+app.get('/tripRequest/refresh/status', auth,  function (req, res)
+{
+    console.log("Step1");      // your JSON
+    var user = basicAuth(req);
+    console.log(user)
+
+    //Check who send the request (Creator - Traveller)
+    TripRequest.find({'from': user.name, 'statusMode':{$ne: 2}}, 'to statusMode', function (err, isCreatorOfTripRequest)
+    { // If I am the creator then give me the not rejected travellers
+        if (err)
+        {
+            console.log(err);
+            res.status(500).send('Server Internal Error');
+        }
+        else
+        {
+            console.log("Step2");
+            // If I am the Creator of the trip!
+            if (isCreatorOfTripRequest.length)
+            {
+                //1a found travellers
+                //create TravellerStatus
+                console.log(isCreatorOfTripRequest);
+                console.log("Step3");
+                var travellerStatus = [];
+                for (var i = 0 ; i < isCreatorOfTripRequest.length; i++)
+                {
+                    let email = isCreatorOfTripRequest[i].to;
+                    let status = isCreatorOfTripRequest[i].statusMode;
+
+                    travellerStatus.push({email: status});
+                }
+
+                // Calculate the Status of The Trip!
+                let sum = isCreatorOfTripRequest.reduce(function(a, b){return a.statusMode+b.statusMode});
+                if(sum === isCreatorOfTripRequest.length)
+                {
+                    console.log("Step4");
+                    //Trip Has Started
+                    res.json({"tripStatus": 1, "travellerStatus": travellerStatus});
+
+                    //build a trip
+                    //delete ths request?
+                }
+                else
+                {
+                    console.log("Step5");
+                    res.json({"tripStatus": 0, "travellerStatus": travellerStatus});
+                }
+                return;
+            }
+            // I am not the Creator!!!
+            else
+            {
+                console.log("Step6");
+                //Fetch my Trip Request
+                TripRequest.find({'to': user.name, statusMode:{$eq: 1}}, 'from statusMode', function (err, myTripRequest)
+                {
+                    if (err)
+                    {
+                        console.log(err);
+                        res.status(500).send('Server Internal Error');
+                    }
+                    else
+                    {
+                        console.log("Step7");
+                        // if I have accepted  then get me the status of all the other travellers!!
+                        if (myTripRequest.length)
+                        {
+                            TripRequest.find({'from': myTripRequest[0].from, 'to': {$ne: user.name}}, 'to statusMode', function (err, invitedInTripRequest)
+                            {
+
+                                if (err)
+                                {
+                                    res.status(500).send('Server Internal Error');
+                                }
+                                else
+                                {
+                                    console.log("Step8");
+                                    //creator of trip Request
+                                    var travellerStatus = {};
+                                    travellerStatus[myTripRequest[0].from] = 1;
+
+                                    //IF there are at lest two persons in the Trip (1 Co- Traveller)!
+                                    if (invitedInTripRequest.length>0)
+                                    {
+                                        //create Travellers!
+
+                                        console.log("Step9");
+                                        var sum = 0
+                                        for (var i = 0 ; i < invitedInTripRequest.length; i++)
+                                        {
+                                            travellerStatus[invitedInTripRequest[i].to] = invitedInTripRequest[i].statusMode
+                                            sum += invitedInTripRequest[i].statusMode
+                                        }
+                                        if (sum === invitedInTripRequest.length)
+                                        {
+
+                                            console.log("Step10");
+                                            res.json({"tripStatus": 1, "travellerStatus": travellerStatus});
+
+                                            //build a trip
+                                            //delete ths request?
+                                        }
+                                        else
+                                        {
+                                            console.log("Step11");
+                                            res.json({"tripStatus": 0, "travellerStatus": travellerStatus});
+                                        }
+                                    }
+
+                                    // If there are two persons. Me and the creator Then Start Trip!
+                                    else
+                                    {
+                                        console.log("Step12");
+                                        res.json({"tripStatus": 1, "travellerStatus": travellerStatus});
+                                        //build a trip
+                                        //delete ths request?
+                                    }
+
+                                }
+                            });
+                        }
+                        // 1b Iam the creator. but could not find travellers
+                        else
+                        {
+                            console.log("step13");
+                            res.json({"tripStatus": 2, "travellerStatus": {"":0}});
+                        }
+                    }
+                });
+            }
+        }
+    });
+
+});
+
+
+//**************************************
+// Response Trip Request
+//**************************************
+app.post('/tripRequest/response', auth, function (req, res)
+{
+    console.log(req.body)
+    var user = basicAuth(req);
+    res.send("")
+
+});
+
+
+//**************************************
+// CancelTrip Request
+//**************************************
+app.get('/tripRequest/cancel', auth, function (req, res)
+{
+    console.log(req.body)
+    console.log("cancelled Trip Successfully")
+    var user = basicAuth(req);
+    res.send("")
+
+
+});
 
 
 //Create Server
