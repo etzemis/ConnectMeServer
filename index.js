@@ -31,8 +31,8 @@ app.set('port', process.env.PORT || 3000);
 // Connect To Mongo Database
 //**************************************
 
-// var dbUrl = "mongodb://localhost:27017/ConnectMeDB";
-var dbUrl = "mongodb://etzemis:1234@waffle.modulusmongo.net:27017/agOdag4u";
+//var dbUrl = "mongodb://localhost:27017/ConnectMeDB";
+var dbUrl = "mongodb://etzemis:1234@jello.modulusmongo.net:27017/jijYxu5x";
 mongoose.connect(dbUrl);
 
 
@@ -544,7 +544,7 @@ app.get('/tripRequest/refresh/invitations', auth, function (req, res)
                                 }
                             }
 
-                            console.log(coTravellers)
+                            console.log(coTravellers);
 
                             //get the creator
                             User.find({'email': creatorOfTripRequest[0].from}, function (err, creator) {
@@ -552,7 +552,7 @@ app.get('/tripRequest/refresh/invitations', auth, function (req, res)
                                     res.status(500).send('Server Internal Error');
                                 } else {
                                     if (creator.length !== 0) {
-                                        console.log(creator)
+                                        console.log(creator);
                                         //get other users
                                         User.find({'email': {$in: coTravellers}}, function (err, usersInTrip) {
                                             if (err) {
@@ -564,7 +564,7 @@ app.get('/tripRequest/refresh/invitations', auth, function (req, res)
                                                 }
                                                 else
                                                 {
-                                                    res.json(creator)
+                                                    res.json(creator);
                                                 }
                                             }
                                         });
@@ -572,9 +572,6 @@ app.get('/tripRequest/refresh/invitations', auth, function (req, res)
                                     }
                                 }
                             });
-
-
-
                         } else
                         {
                             res.json({message: "The trip was cancelled!"});
@@ -605,7 +602,8 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
         if (err)
         {
             res.status(500).send('Server Internal Error');
-        } else
+        }
+        else
         {
 
 //-------------------------------------------------------------
@@ -620,16 +618,16 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                 console.log(isCreatorOfTripRequest);
                 var travellerStatus = {};
                 var sum = 0;
-                var statusMode = [];
-                var travellerEmail = [];
+                var statusMode = [1];
+                var travellerEmail = [user.name];
 
                 for (var i = 0; i < isCreatorOfTripRequest.length; i++)
                 {
 
                     travellerStatus[isCreatorOfTripRequest[i].to] = isCreatorOfTripRequest[i].statusMode;
                     sum += isCreatorOfTripRequest[i].statusMode;
-                    travellerEmail[i] = isCreatorOfTripRequest[i].to;
-                    statusMode[i] = 1;
+                    travellerEmail[i+1] = isCreatorOfTripRequest[i].to;
+                    statusMode[i+1] = 1;
                 }
 
                 // travellerStatus - [User Email: User Status in Trip Request ( Accepted, Rejected, waiting)]
@@ -647,7 +645,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
 
                     var longitude = 0;
                     var latitude = 0;
-                    User.find({'email': {"$in": travellerEmail.concat(user.name)}}, 'location', function (err, travellersLocation)
+                    User.find({'email': {"$in": travellerEmail}}, 'location', function (err, travellersLocation)
                     {
                         if (err)
                         {
@@ -666,7 +664,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                 latitude = latitude / travellersLocation.length;
                                 console.log("Creator: creating the trip...");
 
-                                var newTrip = new Trip({creator: user.name, travellers: travellerEmail, statusMode: statusMode, meetingPoint: [longitude, latitude]});
+                                var newTrip = new Trip({travellers: travellerEmail, statusMode: statusMode, meetingPoint: [longitude, latitude]});
                                 newTrip.save(function (err)
                                 {
                                     if (err)
@@ -689,7 +687,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                                 if (removedTripRequests.result.n > 0)
                                                 {
                                                     console.log("Creator: update the users mode status (mine and cotravellers)...");
-                                                    User.update({'email': {"$in": travellerEmail.concat(user.name)}}, {$set: {'statusMode': 4}}, {multi: true}, function (err, usersUpdated)
+                                                    User.update({'email': {"$in": travellerEmail}}, {$set: {'statusMode': 4}}, {multi: true}, function (err, usersUpdated)
                                                     {
 
                                                         if (err)
@@ -729,7 +727,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                     });
 
                 }
-                else if (sum === 2 * isCreatorOfTripRequest.length)
+                else if (sum === 2*isCreatorOfTripRequest.length)
                 {
                     console.log("Creator: The trip was cancelled because everyone reject the invitation...");
                     console.log("Creator: Revmove the trip requests...");
@@ -770,20 +768,20 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                         }
                     });
 
-                } else
+                }
+                else
                 {
-                    console.log("Creator: The trip is pending...");
-
+                    console.log("Creator: Trip request pending...");
                     res.json({"tripStatus": 0, "travellerStatus": travellerStatus});
                 }
             }
 //-------------------------------------------------------------
-// I am not the Creator!!!
+// I am just a cotraveller!
 //-------------------------------------------------------------
             else
             {
                 console.log("Enter traveller refresh status...");
-                //Fetch my Trip Request (only if I had accept the trip request)
+                //Fetch the Trip Request in which I belong to (only if I had accepted the trip request)
                 TripRequest.find({'to': user.name, statusMode: {$eq: 1}}, 'from statusMode', function (err, myTripRequest)
                 {
                     if (err)
@@ -793,7 +791,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                     } else
                     {
 
-                        // if I exist in trip request table then I will get the status of all the other travellers!!
+                        // if I am in trip request table then I will get the status of all the other travellers!!
                         if (myTripRequest.length > 0)
                         {
                             console.log("Traveller:I was found in trip request table...");
@@ -804,20 +802,21 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                 if (err)
                                 {
                                     res.status(500).send('Server Internal Error');
-                                } else
+                                }
+                                else
                                 {
                                     //creator of trip Request
                                     var travellerStatus = {};
                                     travellerStatus[myTripRequest[0].from] = 1;
 
-                                    //IF there are at lest two persons in the trip request (1 Co-Traveller)!
+                                    //If there are at least two persons in the trip request mode (i.e. the creator and 1 Co-Traveller)!
                                     if (invitedInTripRequest.length > 0)
                                     {
                                         console.log("Traveller: Cotravellers found in trip-request table...(at least is only me)");
                                         //create Travellers!
                                         var sum = 0;
-                                        var statusMode = [];
-                                        var travellerEmail = [];
+                                        var statusMode = [1];
+                                        var travellerEmail = [myTripRequest[0].from];
                                         for (var i = 0; i < invitedInTripRequest.length; i++)
                                         {
                                             if (invitedInTripRequest[i].to !== user.name)
@@ -825,15 +824,15 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                                 travellerStatus[invitedInTripRequest[i].to] = invitedInTripRequest[i].statusMode;
                                             }
                                             sum += invitedInTripRequest[i].statusMode;
-                                            travellerEmail[i] = invitedInTripRequest[i].to;
-                                            statusMode[i] = 1;
+                                            travellerEmail[i+1] = invitedInTripRequest[i].to;
+                                            statusMode[i+1] = 1;
                                         }
                                         if (sum === invitedInTripRequest.length)
                                         {
                                             console.log("Traveller: the trip must begin...");
 
-                                            //get the location of the rest of the travellers and the cretor so as to compute the meeting point
-                                            User.find({'email': {"$in": travellerEmail.concat(myTripRequest[0].from)}}, 'location', function (err, travellersLocation)
+                                            //get the location of the travellers (creator and cotravellers) so as to compute the meeting point
+                                            User.find({'email': {"$in": travellerEmail}}, 'location', function (err, travellersLocation)
                                             {
                                                 if (err)
                                                 {
@@ -855,8 +854,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
 
                                                         //build a trip
                                                         console.log("Traveller: Creating the trip...");
-
-                                                        var newTrip = new Trip({creator: myTripRequest[0].from, travellers: travellerEmail, statusMode: statusMode, meetingPoint: [longitude, latitude]});
+                                                        var newTrip = new Trip({travellers: travellerEmail, statusMode: statusMode, meetingPoint: [longitude, latitude]});
                                                         newTrip.save(function (err)
                                                         {
                                                             if (err)
@@ -865,7 +863,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                                                 res.status(500).send('Server Internal Error');
                                                             } else
                                                             {
-                                                                //delete ths request?
+                                                                //delete this request from the trip request table
                                                                 console.log("Traveller: Removing trip request from the table...");
                                                                 TripRequest.remove({from: myTripRequest[0].from}, function (err, removedTripRequests)
                                                                 {
@@ -876,7 +874,7 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                                                     {
                                                                         if (removedTripRequests.result.n > 0)
                                                                         {
-                                                                            User.update({'email': {"$in": [travellerEmail, myTripRequest[0].from]}}, {$set: {'statusMode': 4}}, {multi: true}, function (err, usersUpdated)
+                                                                            User.update({'email': {"$in": travellerEmail}}, {$set: {'statusMode': 4}}, {multi: true}, function (err, usersUpdated)
                                                                             {
                                                                                 if (err)
                                                                                 {
@@ -909,17 +907,62 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                                     }
                                                 }
                                             });
-
-                                        } else
+                                        }
+                                        else if (sum === 2 * invitedInTripRequest.length)
                                         {
-                                            console.log("Step11");
+                                            console.log("Traveller: The trip must be cancelled because cotravellers (except me) have already rejected the invitation...");
+                                            TripRequest.remove({from: myTripRequest[0].from}, function (err, removedTripRequests)
+                                            {
+                                                console.log("Traveller: Revmove the trip request...");
+                                                if (err)
+                                                {
+                                                    res.status(500).send('Server Internal Error');
+                                                } else
+                                                {
+                                                    if (removedTripRequests.result.n > 0)
+                                                    {
+                                                        console.log("Traveller: Update my user mode status...");
+
+                                                        User.update({'email': user.name}, {$set: {'statusMode': 2}}, function (err, usersUpdated)
+                                                        {
+                                                            if (err)
+                                                            {
+                                                                res.status(500).send('Server Internal Error');
+                                                            } else
+                                                            {
+                                                                if (usersUpdated)
+                                                                {
+                                                                    res.json({"tripStatus": 2, "travellerStatus": {"": 0}});
+                                                                    console.log("\nUser status: has destination (" + user.name + ")\n");
+                                                                } else
+                                                                {
+                                                                    res.status(401).send('User not found!');
+                                                                }
+                                                            }
+                                                        });
+                                                        console.log("Removed Trip requests Successfully");
+                                                    } else
+                                                    {
+                                                        res.status(401).send('trip requests not found!');
+                                                    }
+                                                }
+                                            });
+                                        }
+                                        else
+                                        {
+                                            console.log("Traveller: Trip request pending...");
                                             res.json({"tripStatus": 0, "travellerStatus": travellerStatus});
                                         }
-                                    } else //if nobody found, maybe somebody already in trip??? just checking...
+                                    }
+//let's discuss this, it seems that it is useless to check if co-travellers exist since i am a cotraveller too
+// however, it is possible after doing the first query and find who created the trip request when to query again so as to get the trip cotravellers, nothing to be found
+// because in the meantime maybe another cotraveller had created the trip because everyone accepted the trip request or the creator had chosen to cancel the trip request
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                                    else //if no cotraveller was found, maybe cotravellers are already in trip... Just checking...
                                     {
-                                        console.log("Traveller: Not found in trip request...");
+                                        console.log("Traveller: Not cotraveller (including me) found in trip request...");
 
-                                        Trip.find({'travellers': user.name}, 'travellers creator', function (err, alreadyInTrip)
+                                        Trip.find({'travellers': user.name}, 'travellers', function (err, alreadyInTrip)
                                         {
                                             if (err)
                                             {
@@ -932,9 +975,9 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                                     console.log("Traveller: Found in trip...");
 
                                                     var travellerStatus = {};
-                                                    travellerStatus[alreadyInTrip[0].creator] = 1;
+                                                    travellerStatus[alreadyInTrip[0].travellers[0]] = 1;
 
-                                                    for (var i = 0; i < alreadyInTrip[0].length; i++)
+                                                    for (var i = 1; i < alreadyInTrip[0].length; i++)
                                                     {
                                                         if (alreadyInTrip[0].travellers[i] !== user.name)
                                                         {
@@ -943,22 +986,24 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                                         }
                                                     }
                                                     res.json({"tripStatus": 1, "travellerStatus": travellerStatus});
-                                                } else
+                                                }
+                                                else
                                                 {
                                                     console.log("Traveller: not Found nowhere... The trip had probably been cancelled");
-
                                                     res.json({"tripStatus": 2, "travellerStatus": {"": 0}});
                                                 }
                                             }
                                         });
                                     }
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
                                 }
                             });
                         }
-                        //I am not in trip request table (neither as creator nor as traveller), i.e. check in the trip table.
+                        //If I am not in a trip request table (neither as a creator nor as a traveller), i.e. check in the trip table.
                         else
                         {
-                            Trip.find({'creator': user.name}, 'travellers', function (err, alreadyInTrip)
+                            Trip.find({'travellers': user.name}, 'travellers', function (err, alreadyInTrip)
                             {
                                 if (err)
                                 {
@@ -967,51 +1012,26 @@ app.get('/tripRequest/refresh/status', auth, function (req, res)
                                 {
                                     if (alreadyInTrip.length > 0)
                                     {
-                                        console.log("Creator: I am in the trip table... Informed last...");
+                                        console.log("Co-traveller or creator: Found in trip table!");
 
                                         var travellerStatus = {};
-                                        for (var i = 0; i < alreadyInTrip[0].travellers.length; i++)
+                                        travellerStatus[alreadyInTrip[0].travellers[0]] = 1;
+                                        for (var i = 1; i < alreadyInTrip[0].travellers.length; i++)
                                         {
-                                            //put by default 1 because the travellers inside a trip, had previously accepted the triprequest
-                                            travellerStatus[alreadyInTrip[0].travellers[i]] = 1;
+                                            if (alreadyInTrip[0].travellers[i] !== user.name)
+                                            {
+                                                //put by default 1 because the travellers inside a trip, had previously accepted the triprequest
+                                                travellerStatus[alreadyInTrip[0].travellers[i]] = 1;
+                                            }
                                         }
                                         res.json({"tripStatus": 1, "travellerStatus": travellerStatus});
                                     }
                                     else
                                     {
-                                        //here we enter if traveller was not found previously in trip request,
-                                        Trip.find({'travellers': user.name}, 'travellers', function (err, travellersInTrip)
-                                        {
-                                            if (err)
-                                            {
-                                                console.log(err);
-                                                res.status(500).send('Server Internal Error');
-                                            }
-                                            else
-                                            {
-                                                if (travellersInTrip.length > 0)
-                                                {
-                                                    console.log("Traveller: I am in the trip table... Informed last...");
-                                                    var travellerStatus = {};
-                                                    for (var i = 0; i < travellersInTrip[0].travellers.length; i++)
-                                                    {
-                                                        //put by default 1 because the travellers inside a trip, had previously accepted the triprequest
-                                                        travellerStatus[travellersInTrip[0].travellers[i]] = 1;
-                                                    }
-                                                    res.json({"tripStatus": 1, "travellerStatus": travellerStatus});
-                                                }
-                                                else
-                                                {
-                                                    console.log("Traveller or Creator: Nowhere... Trip cancelled");
-
-                                                    res.json({"tripStatus": 2, "travellerStatus": {"": 0}});
-
-                                                }
-                                            }
-                                        });
+                                        console.log("Co-traveller or creator: Nowhere... Trip cancelled");
+                                        res.json({"tripStatus": 2, "travellerStatus": {"": 0}});
                                     }
                                 }
-
                             });
                         }
                     }
@@ -1059,7 +1079,7 @@ app.post('/tripRequest/response', auth, function (req, res)
                             res.status(500).send('Server Internal Error');
                         } else
                         {
-                            if (userUpdated)
+                            if (userUpdated.nModified > 0)
                             {
                                 console.log("\nUser status: in trip request (" + user.name + ")\n");
                             } else
@@ -1121,7 +1141,7 @@ app.get('/tripRequest/cancel', auth, function (req, res)
                                     res.status(500).send('Server Internal Error');
                                 } else
                                 {
-                                    if (userUpdated)
+                                    if (userUpdated.nModified > 0)
                                     {
                                         res.send("Success");
                                         console.log("\nUser status: has destination (" + user.name + ")\n");
@@ -1162,7 +1182,6 @@ app.get('/tripRequest/cancel', auth, function (req, res)
                                     res.status(500).send('Server Internal Error');
                                 } else
                                 {
-                                    console.log(userUpdated);
                                     if (userUpdated.nModified > 0)
                                     {
                                         res.send("Success");
@@ -1187,8 +1206,6 @@ app.get('/tripRequest/cancel', auth, function (req, res)
 });
 
 
-
-
 //**************************************
 // TRIP
 //**************************************
@@ -1196,13 +1213,12 @@ app.get('/tripRequest/cancel', auth, function (req, res)
 //**************************************
 // TRIP Init
 //**************************************
-
 app.get('/trip/init', auth, function (req, res)
 {
     console.log(req.body);
     var user = basicAuth(req);
 
-    Trip.find({'creator': user.name}, 'meetingPoint', function (err, isCreatorOfTrip)
+    Trip.find({'travellers': user.name}, 'meetingPoint', function (err, isTraveller)
     {
         if (err)
         {
@@ -1210,40 +1226,18 @@ app.get('/trip/init', auth, function (req, res)
             res.status(500).send('Server Internal Error');
         } else
         {
-            if(isCreatorOfTrip.length)
+            if (isTraveller.length)
             {
-                console.log("Return Meeting Point for Creator")
+                console.log("Return Meeting Point for Traveller");
                 //return meeting point
-                res.json({"meetingPoint": isCreatorOfTrip[0].meetingPoint})
-            }
-            else
+                res.json({"meetingPoint": isTraveller[0].meetingPoint});
+            } else
             {
-                Trip.find({'travellers': user.name}, 'meetingPoint', function (err, isTraveller)
-                {
-                    if (err)
-                    {
-                        console.log(err);
-                        res.status(500).send('Server Internal Error');
-                    } else
-                    {
-                        if(isTraveller.length)
-                        {
-                            console.log("Return Meeting Point for Traveller")
-                            //return meeting point
-                            res.json({"meetingPoint": isTraveller[0].meetingPoint})
-                        }
-                        else
-                        {
-                            res.json({"message": "You are not included inside a Trip"})
-                        }
-
-                    }
-                });
+                res.json({"message": "You are not included inside a Trip"});
             }
         }
     });
 });
-
 
 //**************************************
 // TRIP - Fetch Travellers
@@ -1253,8 +1247,7 @@ app.get('/trip/travellers', auth, function (req, res)
     console.log(req.body);
     var user = basicAuth(req);
 
-    console.log("TEST____________");
-    Trip.find({$or: [{'creator': user.name}, {'travellers': user.name, 'statusMode': {$eq: 1}}]}, 'creator travellers', function (err, coTravellers)
+    Trip.find({'travellers': user.name, 'statusMode': {$eq: 1}}, 'travellers', function (err, coTravellers)
     {
         if (err)
         {
@@ -1262,13 +1255,9 @@ app.get('/trip/travellers', auth, function (req, res)
             res.status(500).send('Server Internal Error');
         } else
         {
-            if(coTravellers.length)
+            if(coTravellers.length > 0)
             {
                 var myTravellers = [];
-                if (coTravellers[0].creator !== user.name) {
-                    myTravellers = [coTravellers[0].creator];
-                }
-
                 for (var i = 0; i < coTravellers[0].travellers.length; i++)
                 {
                     if(coTravellers[0].travellers[i] !== user.name)
@@ -1277,9 +1266,8 @@ app.get('/trip/travellers', auth, function (req, res)
                     }
                 }
 
-                console.log("TEST____________My Travellers"+myTravellers);
+                console.log("/trip/travellers"+myTravellers+"\n");
                 //get User Objects
-
                 User.find({'email': {$in: myTravellers}}, function (err, users)
                 {
                     if (err)
@@ -1292,7 +1280,6 @@ app.get('/trip/travellers', auth, function (req, res)
                         res.json(users);
                     }
                 });
-
             }
             else
             {
@@ -1302,8 +1289,119 @@ app.get('/trip/travellers', auth, function (req, res)
     });
 });
 
-//Create Server
+//**************************************
+// TRIP - Arrived At Destination
+//**************************************
 
+app.get('/trip/destination', auth, function (req, res)
+{
+    var user = basicAuth(req);
+
+    Trip.find({'travellers': user.name}, 'travellers statusMode', function (err, coTravellers)
+    {
+        if (err)
+        {
+            console.log(err);
+            res.status(500).send('Server Internal Error');
+        } else
+        {
+            if (coTravellers.length > 0)
+            {
+                var sum = 0;
+                var statusMode =  coTravellers[0].statusMode;
+                for (var i = 0; i < coTravellers[0].statusMode.length; i++)
+                {
+                    if( coTravellers[0].travellers[i] === user.name)
+                    {
+                        statusMode[i] = 2;
+                    }
+                    sum += statusMode[i];
+                }
+
+                if (2 * (coTravellers[0].statusMode.length) === sum)
+                {
+                    Trip.remove({travellers: user.name}, function (err, removedTrip)
+                    {
+                        if (err)
+                        {
+                            res.status(500).send('Server Internal Error');
+                        } else
+                        {
+                            if (removedTrip.result.n > 0)
+                            {
+                                //if the cootraveller reaches destination, we must update its status mode in user database (active)...
+                                User.update({'email': user.name}, {$set: {'statusMode': 1}}, function (err, userUpdated)
+                                {
+                                    if (err)
+                                    {
+                                        res.status(500).send('Server Internal Error');
+                                    } else
+                                    {
+                                        if (userUpdated.nModified > 0)
+                                        {
+                                            console.log("\nUser status: active (" + user.name + ")\n");
+                                        } else
+                                        {
+                                            res.status(401).send('User not found in User table!');
+                                        }
+                                    }
+                                });
+
+                                console.log("Traveller: The trip record was successfully removed!");
+                            } else
+                            {
+                                res.status(401).send('trip request not found!');
+                            }
+                        }
+                    });
+                }
+                else
+                {
+                    Trip.update({'travellers': user.name}, {$set: {'statusMode': statusMode}}, function (err, tripUpdated)
+                    {
+                        if (err)
+                        {
+                            console.log(err);
+                            res.status(500).send('Server Internal Error');
+                        } else
+                        {
+                            //If the trip record was updated successfully, it means that the trip had not been cancelled by the creator.
+                            if (tripUpdated.nModified > 0)
+                            {
+                                //if the cootraveller reaches destination, we must update its status mode in user database (active)...
+                                User.update({'email': user.name}, {$set: {'statusMode': 1}}, function (err, userUpdated)
+                                {
+                                    if (err)
+                                    {
+                                        res.status(500).send('Server Internal Error');
+                                    } else
+                                    {
+                                        if (userUpdated.nModified > 0)
+                                        {
+                                            console.log("\nUser status: active (" + user.name + ")\n");
+                                        } else
+                                        {
+                                            res.status(401).send('User not found in User table!');
+                                        }
+                                    }
+                                });
+                            } else //if there was not found any trip record, the trip probably was cancelled by the creator...
+                            {
+                                res.status(401).send('Trip record was not found in Trip Table!');
+                            }
+                        }
+                    });
+                }
+            } else
+            {
+                res.status(401).send('Trip record was not found in Trip Table!');
+            }
+            res.send("Success");
+        }
+    });
+});
+
+//Create Server
 http.createServer(app).listen(app.get('port'), function () {
     console.log('Express server listening on port ' + app.get('port'));
 });

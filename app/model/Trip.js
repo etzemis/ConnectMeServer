@@ -9,7 +9,6 @@ var Schema = mongoose.Schema;
 
 // create a schema
 var tripSchema = new Schema({
-    creator: {type: String},
     travellers: [String],
     statusMode: [Number],
     meetingPoint:
